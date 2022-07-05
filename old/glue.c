@@ -44,29 +44,8 @@
 #include <sys/stat.h>
 #include <uk/essentials.h>
 #include <pte_types.h>
-#include <sys/epoll.h>
 #include <sys/time.h>
 
-int epoll_create(int size __unused)
-{
-	return 0;
-}
-
-int epoll_create1(int flags)
-{
-	errno = ENFILE;
-	return -1;
-}
-
-int epoll_ctl(int epfd __unused, int op __unused, int fd __unused, struct epoll_event *event __unused)
-{
-	return 0;
-}
-
-int epoll_wait(int epfd __unused, struct epoll_event *events __unused, int maxevents __unused, int timeout __unused)
-{
-	return 0;
-}
 
 int mincore(void *addr __unused, size_t length __unused, unsigned char *vec __unused)
 {
@@ -139,14 +118,6 @@ ssize_t tee(int fd_in __unused, int fd_out __unused, size_t len __unused,
 	return -1;
 }
 
-typedef void socklen_t;
-struct sockaddr;
-int accept4(int sockfd __unused, struct sockaddr *addr __unused,
-	    socklen_t *addrlen __unused, int flags __unused)
-{
-	errno = ENOSYS;
-	return -1;
-}
 
 int fchmodat(int dirfd __unused, const char *pathname __unused,
 	     mode_t mode __unused, int flags __unused)
