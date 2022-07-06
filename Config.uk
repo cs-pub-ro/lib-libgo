@@ -3,9 +3,3 @@ config LIBGO
 	default n
 	select LIBUKDEBUG
 	select LIBUKALLOC
-	select LIBNEWLIBC
-	select LIBUKMMAP
-	select LIBPOSIX_SYSINFO
-	select LIBPTHREAD_EMBEDDED
-	select LIBLWIP
-	select LIBPOSIX_USER

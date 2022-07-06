@@ -41,6 +41,8 @@
 #include <sys/statfs.h>
 #include <sys/stat.h>
 #include <uk/essentials.h>
+#include <fcntl.h>
+#include <stdlib.h>
 
 int klogctl(int type __unused, char *bufp __unused, int len __unused)
 {
@@ -50,6 +52,18 @@ int klogctl(int type __unused, char *bufp __unused, int len __unused)
 
 ssize_t sendfile64(int out_fd __unused, int in_fd __unused,
 		   off_t *offset __unused, size_t count __unused)
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+int posix_openpt(int flags __unused)
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+int unlockpt(int fd __unused)
 {
 	errno = ENOSYS;
 	return -1;

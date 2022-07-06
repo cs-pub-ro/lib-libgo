@@ -65,11 +65,12 @@ LIBGOBACKTRACE_EXTRACTED = $(LIBGCC_EXTRACTED)/libbacktrace
 ################################################################################
 # Library includes
 ################################################################################
+LIBGO_COMMON_INCLUDES-y += -I$(LIBGO_BASE)/include
 LIBGO_COMMON_INCLUDES-y += -I$(LIBGCC_EXTRACTED)/include
 LIBGO_COMMON_INCLUDES-y += -I$(LIBGCC_EXTRACTED)/libgcc
+LIBGO_COMMON_INCLUDES-y += -I$(LIBGCC_EXTRACTED)/gcc
 LIBGO_COMMON_INCLUDES-y += -I$(LIBGCC_EXTRACTED)/gcc/include
 LIBGO_COMMON_INCLUDES-y += -I$(LIBGCC_EXTRACTED)/gcc/config/i386
-LIBGO_COMMON_INCLUDES-y += -I$(LIBGO_BASE)/include
 
 LIBGO_INCLUDES-y += -I$(LIBGO_BASE)
 LIBGO_INCLUDES-y += -I$(LIBGO_EXTRACTED)
@@ -199,6 +200,7 @@ LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/go-unsafe-pointer.c
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/go-unsetenv.c
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/go-unwind.c
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/go-varargs.c
+LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/go-main.c
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/panic.c
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/print.c
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/proc.c
