@@ -68,3 +68,8 @@ int unlockpt(int fd __unused)
 	errno = ENOSYS;
 	return -1;
 }
+
+int sigaltstack(const void *nss __unused, const void *oss __unused)
+{
+	return 0;
+}
