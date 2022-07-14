@@ -3,3 +3,11 @@ config LIBGO
 	default n
 	select LIBUKDEBUG
 	select LIBUKALLOC
+
+if LIBGO
+
+menu "Packages"
+source "/home/simuboost/zalando/goou/libs/lib-libgo/libgo/packages_config.uk"
+endmenu
+
+endif

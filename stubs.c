@@ -32,10 +32,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * stubs
- */
-
 #include <stdio.h>
 #include <errno.h>
 #include <sys/statfs.h>

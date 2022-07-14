@@ -1,23 +1,66 @@
-define buildrule_go =
-$(4): $(2) | preprocess
-	$(call build_cmd,GOC,$(1),$(4),\
+# vgolib $pkgname
+vgolib = $(call uc,$(subst .,_,$(subst /,_,$(1))))
+
+# vprefix_golib $libname,$varname(s)
+vprefix_golib = $(addprefix $(call vgolib,$(1))_,$(2))
+
+golibnametoolib = $(addprefix $(BUILD_DIR)/,$(addsuffix /$(notdir $(1)).o,$(1)))
+golibnametoalib = $(addprefix $(BUILD_DIR)/$(dir $(1)),lib$(notdir $(1).a))
+
+# Register a GO library to the build system. This might be the go main
+# or a package (in which case we have additional flags)
+# _addgolib $libname,$extraflags
+define _addgolib =
+$(call mk_sub_build_dir,$(1))
+UK_GOLIBS += $(1)
+$(eval $(call vgolib,$(1))_BASE  := $(_IMPORT_BASE))
+$(eval $(call vgolib,$(1))_BUILD := $(BUILD_DIR)/$(1))
+$(eval $(call vgolib,$(1))_FLAGS := $(3))
+endef
+
+# addgolib $libname
+addgolib = $(call _addgolib,$(1),-fgo-pkgpath=$(1))
+
+# addgoapp $libname
+define addgoapp =
+$(if $(UK_GOAPP), \
+$(error Cannot add GO app $(1). There is already a GO app set $(UK_GOAPP))
+)
+UK_GOAPP = $(1)
+$(call _addgolib,$(1),)
+endef
+
+# addgolib_s $libname,$switch
+define addgolib_s =
+ifeq ($(2),y)
+$(call addgolib,$(1))
+endif
+endef
+
+# Recursively register GO packages to build system
+# addgolib_r $libname,$extraflags
+define addgolib_r =
+
+endef
+
+# build_golib $libname,$source,$target,$extraflags
+define build_golib =
+$(info $(1) $(2) $(3) $(4))
+$(info $($(call vgolib,$(1))_DEPS) $($(call vgolib,$(1))_DEPS-y))
+$(info $(addprefix $($(call vgolib,$(1))_DEPS-y),$(addsuffix .o,$(notdir $($(call vgolib,$(1))_DEPS-y)))))
+$(3): $(2) | preprocess
+	$(call build_cmd,GOPKG,$(1),$(3),\
 		$(GOC) $$(COMPFLAGS) $$(COMPFLAGS-y) \
-		       $$(GOCINCLUDES) $$(GOCINCLUDES-y) \
-		       $$($(call vprefix_lib,$(1),GOCINCLUDES)) $$($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
-		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(GOCFLAGS) $$(GOCFLAGS-y) $$(GOCFLAGS_EXTRA) \
-		       $$($(call vprefix_lib,$(1),GOCFLAGS)) $$($(call vprefix_lib,$(1),GOCFLAGS-y)) \
-		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
-		       $(5) \
-		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
-		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
-		       -c $(2) -o $(4) $(call depflags,$(4))
+			 $$(GOFLAGS) $$(GOFLAGS-y) \
+			 $(4) \
+			 -I $(BUILD_DIR) \
+			 $$(DBGFLAGS) $$(DBGFLAGS-y) \
+			 -c $(filter %.go,$(2)) -o $(3) && \
+		$(AR) rcD $(call golibnametoalib,$(1)) $(3)
 	)
 
 UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(4))
-UK_OBJS-y += $(4)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
+UK_OBJS-y += $(3)
+$(eval $(call vgolib,$(1),OBJS-y) += $(3))
+$(eval $(call vgolib,$(1),CLEAN-y) += $(call build_clean,$(3)))
 endef
