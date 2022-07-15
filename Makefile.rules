@@ -1,14 +1,53 @@
-# vgolib $pkgname
+################################################################################
+# Paths and Filenames
+################################################################################
+
+# Transform $libname to object file name
+# Example: example.com/test -> $(BUILD_DIR)/example.com/test/test.o
+# golibnametoolib $libname(s)
+define golibnametoolib =
+$(addprefix $(BUILD_DIR)/,$(join $(1),\
+	$(addsuffix .o,$(addprefix /,$(notdir $(1))))))
+endef
+
+# Transform $libname to archive file name
+# Example: example.com/test -> $(BUILD_DIR)/example.com/libtest.a
+# golibnametoalib $libname(s)
+define golibnametoalib =
+$(addprefix $(BUILD_DIR)/,$(join $(dir $(1)),\
+	$(addsuffix .a,$(addprefix lib,$(notdir $(1))))))
+endef
+
+################################################################################
+# Variable name prefixes
+################################################################################
+
+# Transform $libname to a variable name. This will uppercase and substitute
+# . and / with underscores.
+# Example: example.com/test -> EXAMPLE_COM_TEST
+# vgolib $libname(s)
 vgolib = $(call uc,$(subst .,_,$(subst /,_,$(1))))
 
+# Build a variable name from $libname
+# Example: example.com/test, SRCS -> EXAMPLE_COM_TEST_SRCS
 # vprefix_golib $libname,$varname(s)
 vprefix_golib = $(addprefix $(call vgolib,$(1))_,$(2))
 
-golibnametoolib = $(addprefix $(BUILD_DIR)/,$(addsuffix /$(notdir $(1)).o,$(1)))
-golibnametoalib = $(addprefix $(BUILD_DIR)/$(dir $(1)),lib$(notdir $(1).a))
+################################################################################
+# Registration
+################################################################################
 
-# Register a GO library to the build system. This might be the go main
-# or a package (in which case we have additional flags)
+# Filter compiler flags commonly used in Unikraft that are not supported by
+# gccgo and trigger a warning during build
+# _filter_flags $flags
+define _gofilter_flags =
+$(subst -ffreestanding,, \
+$(subst -fhosted,,$(1)))
+endef
+
+# Register a GO library to the build system. This might be GO main
+# or a different GO package (in which case we have the addtional
+# -fgo-pkgpath flag)
 # _addgolib $libname,$extraflags
 define _addgolib =
 $(call mk_sub_build_dir,$(1))
@@ -43,19 +82,21 @@ define addgolib_r =
 
 endef
 
-# build_golib $libname,$source,$target,$extraflags
+################################################################################
+# Buildrules for libraries
+################################################################################
+
+# build_golib $libname,$source,$target,$deps,$extraflags
 define build_golib =
-$(info $(1) $(2) $(3) $(4))
-$(info $($(call vgolib,$(1))_DEPS) $($(call vgolib,$(1))_DEPS-y))
-$(info $(addprefix $($(call vgolib,$(1))_DEPS-y),$(addsuffix .o,$(notdir $($(call vgolib,$(1))_DEPS-y)))))
-$(3): $(2) | preprocess
-	$(call build_cmd,GOPKG,$(1),$(3),\
-		$(GOC) $$(COMPFLAGS) $$(COMPFLAGS-y) \
-			 $$(GOFLAGS) $$(GOFLAGS-y) \
-			 $(4) \
-			 -I $(BUILD_DIR) \
-			 $$(DBGFLAGS) $$(DBGFLAGS-y) \
-			 -c $(filter %.go,$(2)) -o $(3) && \
+$(info $(1) $(2) $(3) $(4) $(5))
+$(3): $(2) $(4) | preprocess
+	$(call build_cmd,GCCGO,$(1),$(3),\
+		$(GOC) $$(call _gofilter_flags,$$(COMPFLAGS) $$(COMPFLAGS-y)) \
+		       $$(GOFLAGS) $$(GOFLAGS-y) \
+		       $(5) \
+		       -I $(BUILD_DIR) \
+		       $$(call _gofilter_flags,$$(DBGFLAGS) $$(DBGFLAGS-y)) \
+		       -c $(filter %.go,$(2)) -o $(3) && \
 		$(AR) rcD $(call golibnametoalib,$(1)) $(3)
 	)
 
