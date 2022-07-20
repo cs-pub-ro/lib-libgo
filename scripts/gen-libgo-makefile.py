@@ -2,6 +2,7 @@ import re
 import os
 import shutil
 from collections import OrderedDict
+import logging
 
 def extract_version_from_buildcfg(path):
 	with open(path, 'r') as f:
@@ -9,8 +10,8 @@ def extract_version_from_buildcfg(path):
 			if line.startswith('const version = '):
 				return line[17:-2]
 
-def dep_file_to_config_opt(path):
-	return 'LIBGO_PKG_' + path[:-2].replace('/','_').replace('.','_').upper()
+def vgolib(libname):
+	return libname.replace('.','_').replace('/','_').replace('-','_').upper()
 
 re_gccgo = re.compile(r'^libtool: compile:.*gccgo\s')
 re_gcc   = re.compile(r'^libtool: compile:.*xgcc.*/libgo/')
@@ -18,13 +19,6 @@ re_gosrc = re.compile(r'\s([a-z0-9_\/\-\.]+\.go)')
 re_csrc  = re.compile(r'-c\s([a-z0-9_\/\-\.]+\.(?:S|c))')
 re_out   = re.compile(r'\s-o\s([a-z0-9_\/\-\.]+)')
 re_flags = re.compile(r'\s(-fgo-[a-z0-9_\/\-\.=]+)')
-
-build_cmds = """
-	$(call verbose_cmd,GO,libgo: $(notdir $@), cd $(LIBGO_EXTRACTED) && \\
-	mkdir -p $(dir $@) && \\
-	$(GOC) $(LIBGO_GOFLAGS) -c {}-fgo-pkgpath=$(subst $(LIBGO_BUILD)/,,$(@:.o=)) $(filter %.go,$^) -o $@ && \\
-	objcopy -j .go_export $@ $(@:.o=.gox))
-"""
 
 makefile_rt_header = """# This file has been auto-generated for {}.
 # To re-generate navigate to Unikraft application folder
@@ -38,17 +32,10 @@ makefile_rt_header = """# This file has been auto-generated for {}.
 #
 """
 
-makefile_rt_footer = """
-LIBGO_CLEAN += $(LIBGO_OBJS-y) $(LIBGO_OBJS-y:.o=.gox)
-"""
-
-config_entry = """
-config {}
-	bool \"{}\"
-	default {}
-"""
-
-select_entry = '\tselect {} if LIBGO_STD_INCLUDE_DEPS\n'
+MK_ADDGOLIB = '$(eval $(call _addgolib,{},{}))\n'
+MK_SRCS     = '{}_SRCS += {}\n'
+MK_DEPS     = '{}_DEPS += {}\n'
+MK_FLAGS    = '{}_FLAGS += {}\n'
 
 build_log	= './build.log'
 build_dir	= './x86_64-pc-linux-gnu/'
@@ -56,15 +43,16 @@ base_dir	= os.path.dirname(__file__) + '/..'
 libgo_dir	= base_dir + '/libgo'
 makefile_rt_uk	= libgo_dir + '/Makefile.runtime.uk'
 makefile_nt_uk	= libgo_dir + '/Makefile.native.uk'
-config_uk	= libgo_dir + '/Config.uk'
-std_packages	= libgo_dir + '/std_packages'
+packages_idx	= libgo_dir + '/packages.idx'
+
+logging.basicConfig(level=logging.INFO)
 
 print('Build directory: {}'.format(build_dir))
 print('Target: {}'.format(base_dir))
 
 pkgs = {}
 srcs = []
-pkg_text = ''
+out = ''
 gcc_version = 'unknown'
 with open(build_log, 'r') as bl:
 	for line in bl.readlines():
@@ -124,94 +112,87 @@ with open(build_log, 'r') as bl:
 			continue
 
 		pkgs[obj] = []
-
-		# Extract dependency information
-		# We parse the *.lo.dep file from the build for this
-		dep_path = build_dir + 'libgo/' + obj[:-1] + 'lo.dep'
-
-		deps_text = ''
-		with open(dep_path, 'r') as depf:
-			dep_line = depf.readline().strip()
-			dep_files = dep_line.split(' ')
-			for dep_file in dep_files:
-				if dep_file.endswith('.gox'):
-					dep_obj =  dep_file[:-3] + 'o'
-					deps_text += ' $(LIBGO_BUILD)/' + dep_obj
-					pkgs[obj].append(dep_obj)
+		pkg = obj[:-2]
+		libprefix = vgolib(pkg)
 
 		# Start constructing the build rule for the package
-		res_line = '$(LIBGO_BUILD)/' + obj + ':'
+		out_lib = ''
 
-		matches = re_gosrc.findall(line)
-		for source_file in matches:
-			p = source_file.find('/libgo/')
-			if p < 0:
-				# This is probably one of the files that are generated.
-				# We copy these files to the libgo folder in lib-libgo
-				if source_file.find('/') == -1:
-					print('INFO: Importing generated file "{}"'.format(source_file))
-					path = build_dir + '/libgo/' + source_file
+		# Extract dependency and source file information
+		# We parse the *.lo.dep file from the build for this
+		# To make sure, we do a sanity check by also parsing the
+		# build log
+		src_files = re_gosrc.findall(line)
 
-					# This file contains version information. Extract them.
-					if source_file == 'buildcfg.go':
-						gcc_version = extract_version_from_buildcfg(path)
+		dep_line = ''
+		dep_path = build_dir + 'libgo/' + obj[:-1] + 'lo.dep'
+		with open(dep_path, 'r') as depf:
+			dep_line = depf.readline().strip()
 
-					#shutil.copy(path, generated_dir + '/' + source_file)
-					res_line += ' $(LIBGO_BASE)/libgo/' + source_file
-					continue
-
-				print('WARN: "{}" has unknown path. Ignoring.'.format(source_file))
+		for dep in dep_line.split(' ')[1:]:
+			if dep.endswith('.gox'):
+				pkgs[obj].append(dep[:-3] + 'o')
+				out_lib += MK_DEPS.format(libprefix, dep[:-4])
 				continue
 
-			res_line += ' $(LIBGO_EXTRACTED)/' + source_file[p + 7:]
+			if not dep in src_files:
+				logging.warn('{} not found in build log for package {}'.format(dep, pkg))
+
+			src_files.remove(dep)
+
+			p = dep.find('/libgo/')
+			if p >= 0:
+				# A regular source file
+				out_lib += MK_SRCS.format(libprefix, '$(LIBGO_EXTRACTED)/' + dep[p + 7:])
+				continue
+
+			# This is probably one of the files that are generated.
+			# We copy these files to the libgo folder in lib-libgo
+			if dep.find('/') == -1:
+				logging.info('Importing generated file "{}"'.format(dep))
+				path = build_dir + '/libgo/' + dep
+
+				# This file contains version information. Extract them.
+				if dep == 'buildcfg.go':
+					gcc_version = extract_version_from_buildcfg(path)
+
+				#shutil.copy(path, generated_dir + '/' + dep)
+				out_lib += MK_SRCS.format(libprefix, '$(LIBGO_BASE)/libgo/' + dep)
+				continue
+
+			logging.warn('{} has unknown path. Ignoring.'.format(dep))
+
+		if len(src_files) > 0:
+			logging.warn('Additional sources in build log for package {}'.format(pkg))
 
 		# Check for additional flags
-		res_flags = ''
+		flags = ''
 		matches = re_flags.findall(line)
 		for flag in matches:
 			if flag.startswith('-fgo-pkgpath'):
 				continue
-			res_flags += flag + ' '
 
-		if res_flags != '':
-			print('INFO: Using additional flags "{}" for "{}"'.format(obj, res_flags))
+			flags += ' ' + flag
+			logging.info('Additional flag for {}:{}'.format(pkg, flag))
 
-		# Add package to package makefile
-		pkg_text += res_line + deps_text
-		pkg_text += build_cmds.format(res_flags)
+		out += MK_ADDGOLIB.format(pkg, flags.strip()) + out_lib
 
-pkg_text = makefile_rt_header.format(gcc_version, os.path.basename(__file__)) + pkg_text
-
-pkg_text += '\n'
-for (obj, deps) in pkgs.items():
-	pkg_text += 'LIBGO_OBJS-$(CONFIG_{}) += {}\n'.format(dep_file_to_config_opt(obj), '$(LIBGO_BUILD)/' + obj)
-	if len(deps) == 0:
-		print('INFO: "{}" is an optional package'.format(obj[:-2]))
-
-pkg_text += makefile_rt_footer
+out = makefile_rt_header.format(gcc_version, os.path.basename(__file__)) + out
 
 # Write Makefile.runtime.uk
 with open(makefile_rt_uk, 'w') as pf:
-	pf.write(pkg_text)
+	pf.write(out)
 
-# Write Config.uk and std_packages
-pcf_text = ''
-spf_text = '{packages:['
+# Write packages.idx
+pidx_text = ''
 for (obj, deps) in OrderedDict(sorted(pkgs.items())).items():
-	spf_text += obj[:-2]
-	pcf_text += config_entry.format(dep_file_to_config_opt(obj),
-		obj[:-2], 'n')
+	pidx_text += obj[:-2]
 	for dep in deps:
-		pcf_text += select_entry.format(dep_file_to_config_opt(dep))
-		spf_text += ' ' + dep[:-2]
-	spf_text += '\n'
-spf_text += ']}'
+		pidx_text += ' ' + dep[:-2]
+	pidx_text += '\n'
 
-with open(config_uk, 'w') as pcf:
-	pcf.write(pcf_text)
-
-with open(std_packages, 'w') as spf:
-	spf.write(spf_text)
+with open(packages_idx, 'w') as spf:
+	spf.write(pidx_text)
 
 # Write Makefile.native.uk
 srcs.sort()

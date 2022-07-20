@@ -6,12 +6,4 @@ menuconfig LIBGO
 
 if LIBGO
 
-config LIBGO_STD_INCLUDE_DEPS
-	bool "Automatically include dependencies"
-	default n
-
-menu "Packages"
-source "/home/simuboost/zalando/goou/libs/lib-libgo/libgo/Config.uk"
-endmenu
-
 endif

@@ -1,7 +1,46 @@
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  libgo Makefile.rules
+#
+#  Authors: Marc Rittinghaus <marc.rittinghaus@kit.edu>
+#
+#  Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
 GO_LIBGO_PATH := $(dir $(lastword $(MAKEFILE_LIST)))
 
 GO_BM  := $(addsuffix /scripts/gen-makefile.py,$(GO_LIBGO_PATH))
 GO_PY3 := python3
+
+# To avoid name clashes with regular Unikraft libraries we build all the go
+# packages in the go subfolder of the build directory
+GO_DIR       = /go
+GO_BUILD_DIR = $(BUILD_DIR)$(GO_DIR)
 
 ################################################################################
 # Paths and Filenames
@@ -11,7 +50,7 @@ GO_PY3 := python3
 # Example: example.com/test -> $(BUILD_DIR)/example.com/test/test.o
 # golibnametoolib $libname(s)
 define golibnametoolib =
-$(addprefix $(BUILD_DIR)/,$(join $(1),\
+$(addprefix $(GO_BUILD_DIR)/,$(join $(1),\
 	$(addsuffix .o,$(addprefix /,$(notdir $(1))))))
 endef
 
@@ -19,14 +58,14 @@ endef
 # Example: example.com/test -> $(BUILD_DIR)/example.com/libtest.a
 # golibnametoalib $libname(s)
 define golibnametoalib =
-$(addprefix $(BUILD_DIR)/,$(join $(dir $(1)),\
+$(addprefix $(GO_BUILD_DIR)/,$(join $(dir $(1)),\
 	$(addsuffix .a,$(addprefix lib,$(notdir $(1))))))
 endef
 
 # Receive Makefile path for a library
 # Example: example.com/test -> $(BUILD_DIR)/example.com/test/Makefile
 define golibnametomk =
-$(addprefix $(BUILD_DIR)/,$(addsuffix /Makefile,$(1)))
+$(addprefix $(GO_BUILD_DIR)/,$(addsuffix /Makefile,$(1)))
 endef
 
 ################################################################################
@@ -59,40 +98,49 @@ endef
 # Register a GO library to the build system. This might be GO main
 # or a different GO package (in which case we have the addtional
 # -fgo-pkgpath flag)
-# _addgolib $libname,$extraflags
-define _addgolib =
-$(call mk_sub_build_dir,$(1))
+# __addgolib $libname,$extraflags
+define __addgolib =
+$(call mk_sub_build_dir,$(GO_DIR)/$(1))
 UK_GOLIBS += $(1)
 $(eval $(call vgolib,$(1))_BASE  := $(_IMPORT_BASE))
-$(eval $(call vgolib,$(1))_BUILD := $(BUILD_DIR)/$(1))
+$(eval $(call vgolib,$(1))_BUILD := $(GO_BUILD_DIR)/$(1))
 $(eval $(call vgolib,$(1))_FLAGS += $(2))
 endef
 
+# _addgolib $libname,$extraflags
+_addgolib = $(call __addgolib,$(1),-fgo-pkgpath=$(1) $(2))
+
+# _addgolib $libname,$extraflags
+_addgoapp = $(call __addgolib,$(1),$(2))
+
+# Register a GO library and append it to the list of libraries that need to
+# be processed for dependency resolution before starting the actual build
 # addgolib $libname
-addgolib = $(call _addgolib,$(1),-fgo-pkgpath=$(1))
-addgoapp = $(call _addgolib,$(1),)
+define addgolib
+$(call _addgolib,$(1),)
+UK_GOLIBS_R += $(1)
+endef
 
 # addgolib_s $libname,$switch
-define addgolib_s =
+define addgolib_s
 ifeq ($(2),y)
 $(call addgolib,$(1))
 endif
 endef
 
-# Register a GO library and append it to the list of libraries that need to
-# be processed for dependency resolution before starting the actual build
-# addgolib_r $libname
-define addgolib_r =
-$(call addgolib,$(1))
+# Same as addgolib but for an GO application library supplying the main
+# package
+# addgoapp $libname
+define addgoapp =
+$(call _addgoapp,$(1),)
 UK_GOLIBS_R += $(1)
 endef
 
-# Same as addgolib_r but for an GO application library supplying the main
-# package
-# addgoapp_r $libname
-define addgoapp_r =
+# addgoapp_s $libname,$switch
+define addgoapp_s
+ifeq ($(2),y)
 $(call addgoapp,$(1))
-UK_GOLIBS_R += $(1)
+endif
 endef
 
 ################################################################################
@@ -106,7 +154,7 @@ $(3): $(2) $(4)
 		$(GOC) $$(call _gofilter_flags,$$(COMPFLAGS) $$(COMPFLAGS-y)) \
 		       $$(GOFLAGS) $$(GOFLAGS-y) \
 		       $(5) \
-		       -I $(BUILD_DIR) -I $(BUILD_DIR)libgo \
+		       -I $(GO_BUILD_DIR) \
 		       $$(call _gofilter_flags,$$(DBGFLAGS) $$(DBGFLAGS-y)) \
 		       -c $(filter %.go,$(2)) -o $(3) && \
 		$(AR) rcD $(call golibnametoalib,$(1)) $(3)

@@ -48,7 +48,7 @@ def vgolib(libname):
 	return libname.replace('.','_').replace('/','_').replace('-','_').upper()
 
 # Constants
-MK_ADDGOLIB = '$(eval $(call addgolib,{}))\n'
+MK_ADDGOLIB = '$(eval $(call _addgolib,{}))\n'
 MK_SRCS     = '{}_SRCS += {}\n'
 MK_DEPS     = '{}_DEPS += {}\n'
 
@@ -64,6 +64,8 @@ group.add_argument('-s', dest='std', default=False, action='store_true',
 		   help='Dump dependencies on standard packages instead of generating a Makefile')
 group.add_argument('-c', dest='config', default=False, action='store_true',
 		   help='Generate config entries for dependencies on standard packages instead of generating a Makefile')
+group.add_argument('-r', dest='override', default=False, action='store_true',
+		   help='Dump all dependencies that specify source files for standard packages')
 parser.add_argument('lib_name',
 		    help='Name of the library')
 parser.add_argument('lib_dir',
@@ -86,10 +88,10 @@ libprefix = vgolib(opt.lib_name)
 # Load std packages
 base_dir	= os.path.dirname(__file__) + '/..'
 libgo_dir	= base_dir + '/libgo'
-std_packages	= libgo_dir + '/std_packages'
+packages_idx	= libgo_dir + '/packages.idx'
 
 std_pkgs = {}
-with open(std_packages, 'r') as f:
+with open(packages_idx, 'r') as f:
 	lines = f.readlines()
 	for line in lines:
 		pkgs = line.rstrip().split(' ')
@@ -105,6 +107,12 @@ try:
 	build_info = go_list(opt.lib_dir, opt.files)
 	if opt.json:
 		out = build_info
+	elif opt.override:
+		build_info = json.loads(build_info)
+		for pkg in build_info['packages']:
+			if 'GoFiles' in pkg or 'CFiles' in pkg:
+				if pkg['ImportPath'] in std_pkgs:
+					out += pkg['ImportPath'] + '\n'
 	else:
 		build_info = json.loads(build_info)
 		std_deps = []
