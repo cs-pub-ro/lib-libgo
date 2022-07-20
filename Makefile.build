@@ -1,3 +1,4 @@
+# TODO: Can we create build rules for the Makefiles instead?
 ifneq ($(call qstrip,$(UK_GOLIBS_R) $(UK_GOLIBS_R-y)),)
 $(foreach L,$(UK_GOLIBS_R) $(UK_GOLIBS_R-y), \
 	$(shell $(GO_PY3) $(GO_BM) $(L) \

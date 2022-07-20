@@ -172,8 +172,8 @@ LIBGO_SRCS-y += $(LIBGO_BASE)/stubs.c
 # libgo
 LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/runtime/go-main.c
 
-include $(LIBGO_BASE)/libgo/sources.uk
-include $(LIBGO_BASE)/libgo/packages.uk
+include $(LIBGO_BASE)/libgo/Makefile.native.uk
+include $(LIBGO_BASE)/libgo/Makefile.runtime.uk
 
 # libffi
 LIBGOFFI_SRCS-y += $(LIBGOFFI_EXTRACTED)/src/types.c

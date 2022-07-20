@@ -26,7 +26,7 @@ build_cmds = """
 	objcopy -j .go_export $@ $(@:.o=.gox))
 """
 
-packages_uk_header = """# This file has been auto-generated for {}.
+makefile_rt_header = """# This file has been auto-generated for {}.
 # To re-generate navigate to Unikraft application folder
 #   $ make prepare
 #   $ cd build/libgo/origin
@@ -38,23 +38,26 @@ packages_uk_header = """# This file has been auto-generated for {}.
 #
 """
 
-packages_uk_footer = """
+makefile_rt_footer = """
 LIBGO_CLEAN += $(LIBGO_OBJS-y) $(LIBGO_OBJS-y:.o=.gox)
 """
 
-packages_config_entry = """
+config_entry = """
 config {}
 	bool \"{}\"
 	default {}
 """
 
-build_log	   = './build.log'
-build_dir	   = './x86_64-pc-linux-gnu/'
-base_dir	   = os.path.dirname(__file__)
-libgo_dir	   = base_dir + '/libgo'
-packages_uk	   = libgo_dir + '/packages.uk'
-sources_uk	   = libgo_dir + '/sources.uk'
-packages_config_uk = libgo_dir + '/packages_config.uk'
+select_entry = '\tselect {} if LIBGO_STD_INCLUDE_DEPS\n'
+
+build_log	= './build.log'
+build_dir	= './x86_64-pc-linux-gnu/'
+base_dir	= os.path.dirname(__file__) + '/..'
+libgo_dir	= base_dir + '/libgo'
+makefile_rt_uk	= libgo_dir + '/Makefile.runtime.uk'
+makefile_nt_uk	= libgo_dir + '/Makefile.native.uk'
+config_uk	= libgo_dir + '/Config.uk'
+std_packages	= libgo_dir + '/std_packages'
 
 print('Build directory: {}'.format(build_dir))
 print('Target: {}'.format(base_dir))
@@ -177,7 +180,7 @@ with open(build_log, 'r') as bl:
 		pkg_text += res_line + deps_text
 		pkg_text += build_cmds.format(res_flags)
 
-pkg_text = packages_uk_header.format(gcc_version, os.path.basename(__file__)) + pkg_text
+pkg_text = makefile_rt_header.format(gcc_version, os.path.basename(__file__)) + pkg_text
 
 pkg_text += '\n'
 for (obj, deps) in pkgs.items():
@@ -185,25 +188,33 @@ for (obj, deps) in pkgs.items():
 	if len(deps) == 0:
 		print('INFO: "{}" is an optional package'.format(obj[:-2]))
 
-pkg_text += packages_uk_footer
+pkg_text += makefile_rt_footer
 
-# Write packages.uk
-with open(packages_uk, 'w') as pf:
+# Write Makefile.runtime.uk
+with open(makefile_rt_uk, 'w') as pf:
 	pf.write(pkg_text)
 
-# Write packages_config.uk
+# Write Config.uk and std_packages
 pcf_text = ''
+spf_text = '{packages:['
 for (obj, deps) in OrderedDict(sorted(pkgs.items())).items():
-	pcf_text += packages_config_entry.format(dep_file_to_config_opt(obj),
-		obj[:-2], "n")
+	spf_text += obj[:-2]
+	pcf_text += config_entry.format(dep_file_to_config_opt(obj),
+		obj[:-2], 'n')
 	for dep in deps:
-		pcf_text += "\tselect " + dep_file_to_config_opt(dep) + "\n"
+		pcf_text += select_entry.format(dep_file_to_config_opt(dep))
+		spf_text += ' ' + dep[:-2]
+	spf_text += '\n'
+spf_text += ']}'
 
-with open(packages_config_uk, 'w') as pcf:
+with open(config_uk, 'w') as pcf:
 	pcf.write(pcf_text)
 
-# Write sources.uk
+with open(std_packages, 'w') as spf:
+	spf.write(spf_text)
+
+# Write Makefile.native.uk
 srcs.sort()
-with open(sources_uk, 'w') as sf:
+with open(makefile_nt_uk, 'w') as sf:
 	for cfile in srcs:
 		sf.write('LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/' + cfile + '\n')

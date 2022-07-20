@@ -6,7 +6,7 @@
 #   $ cd gccbuild
 #   $ ../gcc-<GCC_VERSION>/configure --disable-multilib --enable-languages=c,c++,go
 #   $ make V=1 -j`nproc`| tee build.log
-#   $ $(LIBGO_BASE)/build-packages.py
+#   $ $(LIBGO_BASE)/gen-libgo-makefile.py
 #
 $(LIBGO_BUILD)/golang.org/x/xerrors/internal.o: $(LIBGO_EXTRACTED)/go/golang.org/x/xerrors/internal/internal.go
 	$(call verbose_cmd,GO,libgo: $(notdir $@), cd $(LIBGO_EXTRACTED) && \

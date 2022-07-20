@@ -1,4 +1,4 @@
-config LIBGO
+menuconfig LIBGO
 	bool "libgo - Go library"
 	default n
 	select LIBUKDEBUG
@@ -6,8 +6,12 @@ config LIBGO
 
 if LIBGO
 
+config LIBGO_STD_INCLUDE_DEPS
+	bool "Automatically include dependencies"
+	default n
+
 menu "Packages"
-source "/home/simuboost/zalando/goou/libs/lib-libgo/libgo/packages_config.uk"
+source "/home/simuboost/zalando/goou/libs/lib-libgo/libgo/Config.uk"
 endmenu
 
 endif
