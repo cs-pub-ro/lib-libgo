@@ -18,7 +18,7 @@ $(foreach L,$(UK_GOLIBS) $(UK_GOLIBS-y), \
 				$($(call vprefix_golib,$(L),SRCS)) \
 				$($(call vprefix_golib,$(L),SRCS-y)), \
 				$(call golibnametoolib,$(L)), \
-				$(call golibnametoolib, \
+				$(call golibnametoalib, \
 					$($(call vgolib,$(L))_DEPS) \
 					$($(call vgolib,$(L))_DEPS-y)), \
 				$($(call vprefix_golib,$(L),FLAGS)) \

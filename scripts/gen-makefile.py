@@ -41,7 +41,10 @@ import sys
 
 def go_list(lib_dir, files):
 	args = ['go', 'list', '--json', '-a', '--compiler=gccgo', '--deps']
-	args.extend(files)
+	for file in files:
+		if file.endswith('.go'):
+			args.append(file)
+
 	logging.debug(' '.join(args))
 
 	env = os.environ.copy()
