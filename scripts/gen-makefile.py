@@ -72,11 +72,29 @@ def vgolib(libname):
 	libname = libname.replace('-','_')
 	return libname.upper()
 
+def vgosymv3(symbol):
+	symbol = symbol.replace('_', '__')
+	symbol = symbol.replace('.', '_0')
+	symbol = symbol.replace('/', '_1')
+	symbol = symbol.replace('*', '_2')
+	symbol = symbol.replace(',', '_3')
+	symbol = symbol.replace('{', '_4')
+	symbol = symbol.replace('}', '_5')
+	symbol = symbol.replace('[', '_6')
+	symbol = symbol.replace(']', '_7')
+	symbol = symbol.replace('(', '_8')
+	symbol = symbol.replace(')', '_9')
+	symbol = symbol.replace('"', '_a')
+	symbol = symbol.replace(' ', '_b')
+	symbol = symbol.replace(';', '_c')
+	return symbol
+
 # Format string constants
 MK_LINKGOLIB	= '$(eval $(call _linkgolib,{}))\n'
 MK_ADDGOLIB	= '$(eval $(call _addgolib,{},,y))\n'
 MK_SRCS		= '{}_SRCS += {}\n'
 MK_DEPS		= '{}_DEPS += {}\n'
+MK_CFLAGS	= '{}_CFLAGS += {}\n'
 
 # Directory constants
 BASE_DIR	= os.path.dirname(__file__) + '/..'
@@ -186,7 +204,14 @@ try:
 			out += MK_ADDGOLIB.format(pkg['ImportPath'])
 
 			files = pkg['GoFiles'] if 'GoFiles' in pkg else []
-			files.extend(pkg['CFiles'] if 'CFiles' in pkg else [])
+
+			# There are C files in this package. Then also define
+			# GOPKGPATH
+			if 'CFiles' in pkg:
+				files.extend(pkg['CFiles'])
+				out += MK_CFLAGS.format(pkglibprefix,
+					'-D "GOPKGPATH=\\"' +
+					vgosymv3(pkg['ImportPath']) + '\\""')
 
 			for f in files:
 				path = pkg['Dir'] + '/' + f

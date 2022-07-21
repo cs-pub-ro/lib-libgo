@@ -69,7 +69,6 @@ MK_RT_HDR	= \
 MK_ADDGOLIB	= '$(eval $(call _addgolib,{},{}))\n'
 MK_SRCS		= '{}_SRCS += {}\n'
 MK_DEPS		= '{}_DEPS += {}\n'
-MK_FLAGS	= '{}_FLAGS += {}\n'
 MK_LIBGO_SRCS	= 'LIBGO_SRCS-y += $(LIBGO_EXTRACTED)/{}\n'
 
 BUILD_LOG	= './build.log'

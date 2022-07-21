@@ -99,9 +99,6 @@ vgolib = $(call uc,$(subst .,_,$(subst /,_,$(subst -,_,$(1)))))
 # vprefix_golib $libname,$varname(s)
 vprefix_golib = $(addprefix $(call vgolib,$(1))_,$(2))
 
-# Generate GOPKGPATH define
-godefpkgpath =
-
 ################################################################################
 # Registration
 ################################################################################
@@ -131,9 +128,9 @@ define __addgolib =
 $(call mk_sub_build_dir,$(GO_PREFIX)/$(1))
 UK_GOLIBS-y   += $(1)
 UK_ALIBS-$(3) += $(call golibnametoalib,$(1))
-$(eval $(call vgolib,$(1))_BASE  := $(_IMPORT_BASE))
-$(eval $(call vgolib,$(1))_BUILD := $(GO_BUILD_DIR)/$(1))
-$(eval $(call vgolib,$(1))_FLAGS += $(2))
+$(eval $(call vgolib,$(1))_BASE    := $(_IMPORT_BASE))
+$(eval $(call vgolib,$(1))_BUILD   := $(GO_BUILD_DIR)/$(1))
+$(eval $(call vgolib,$(1))_GOFLAGS += $(2))
 endef
 
 # _addgolib $libname,$extraflags,$linkit
@@ -192,10 +189,8 @@ $(call golibnametoalib,$(1)): $(2) $(4) $(call gonotgoobjs,$(1),$(2))
 	)
 
 $(foreach S,$(call gonotgo,$(2)), \
-	$(info $(1) $(S) $(call gonotgoobjs,$(1),$(S))) \
-	$(eval $(call buildrule,$(1),$(S),, \
-				$(call gonotgoobjs,$(1),$(S)), \
-				-DGOPKGPATH=$(call godefpkgpath,$(1)))) \
+	$(eval $(call buildrule,$(call vgolib,$(1)),$(S),, \
+				$(call gonotgoobjs,$(1),$(S)))) \
 )
 
 UK_SRCS-y += $(2)

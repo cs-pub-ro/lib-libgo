@@ -21,8 +21,8 @@ $(foreach L,$(UK_GOLIBS) $(UK_GOLIBS-y), \
 				$(call golibnametoalib, \
 					$($(call vgolib,$(L))_DEPS) \
 					$($(call vgolib,$(L))_DEPS-y)), \
-				$($(call vprefix_golib,$(L),FLAGS)) \
-				$($(call vprefix_golib,$(L),FLAGS-y)))); \
+				$($(call vprefix_golib,$(L),GOFLAGS)) \
+				$($(call vprefix_golib,$(L),GOFLAGS-y)))); \
 	, \
 		$(call verbose_info,Warning: $(L) has no sources$(comma) ignoring...) \
 	); \

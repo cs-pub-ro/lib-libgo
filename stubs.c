@@ -69,3 +69,87 @@ int sigaltstack(const void *nss __unused, const void *oss __unused)
 {
 	return 0;
 }
+
+int madvise(void *addr __unused, size_t length __unused, int advice __unused)
+{
+	return 0;
+}
+
+int mlock(const void *addr __unused, size_t len __unused)
+{
+	return 0;
+}
+
+int munlock(const void *addr __unused, size_t len __unused)
+{
+	return 0;
+}
+
+int mlockall(int flags __unused)
+{
+	return 0;
+}
+
+int munlockall(void)
+{
+	return 0;
+}
+
+int msync(void *addr __unused, size_t length __unused, int flags __unused)
+{
+	return 0;
+}
+
+long ptrace(int request __unused, pid_t pid __unused, void *addr __unused,
+	    void *data __unused)
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+int reboot(int cmd __unused)
+{
+	errno = EPERM;
+	return -1;
+}
+
+int iopl(int level __unused)
+{
+	return 0;
+}
+
+int ioperm(unsigned long from __unused, unsigned long num __unused,
+	   int turn_on __unused)
+{
+	return 0;
+}
+
+int pivot_root(const char *new_root __unused, const char *put_old __unused)
+{
+	errno = EPERM;
+	return -1;
+}
+
+int adjtimex(void *buf __unused)
+{
+	errno = EPERM;
+	return -1;
+}
+
+int acct(const char *filename __unused)
+{
+	return 0;
+}
+
+int setdomainname(const char *name __unused, size_t len __unused)
+{
+	errno = EPERM;
+	return -1;
+}
+
+int settimeofday(const struct timeval *tv __unused,
+		 const struct timezone *tz __unused)
+{
+	errno = EPERM;
+	return -1;
+}
