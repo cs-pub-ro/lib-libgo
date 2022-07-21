@@ -1,16 +1,35 @@
 #!/usr/bin/env python3
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-# Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
+#  Authors: Marc Rittinghaus <marc.rittinghaus@kit.edu>
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
+#  Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
 
 import argparse
 import os
@@ -45,27 +64,40 @@ def go_list(lib_dir, files):
 	return json_text
 
 def vgolib(libname):
-	return libname.replace('.','_').replace('/','_').replace('-','_').upper()
+	libname = libname.replace('.','_')
+	libname = libname.replace('/','_')
+	libname = libname.replace('-','_')
+	return libname.upper()
 
-# Constants
-MK_ADDGOLIB = '$(eval $(call _addgolib,{}))\n'
-MK_SRCS     = '{}_SRCS += {}\n'
-MK_DEPS     = '{}_DEPS += {}\n'
+# Format string constants
+MK_LINKGOLIB	= '$(eval $(call _linkgolib,{}))\n'
+MK_ADDGOLIB	= '$(eval $(call _addgolib,{},,y))\n'
+MK_SRCS		= '{}_SRCS += {}\n'
+MK_DEPS		= '{}_DEPS += {}\n'
+
+# Directory constants
+BASE_DIR	= os.path.dirname(__file__) + '/..'
+LIBGO_DIR	= BASE_DIR + '/libgo'
+PACKAGES_IDX	= LIBGO_DIR + '/packages.idx'
+
+# Standard package reference
+SPR_DEF		= 0 # Regular reference to std pkg
+SPR_FORCE	= 1 # Project overrides std pkg but we force it anyways
+SPR_OVERRIDE	= 2 # Project overrides std pkg
+SPR_INDIRECT	= 3 # Referenced indirectly by other standard package
 
 parser = argparse.ArgumentParser(description='Generates a makefile ')
 parser.add_argument('-v', default=False, action='store_true',
 		    help='Print executed commands')
 parser.add_argument('-o', dest='out', default=None,
 		    help='Output path')
-group = parser.add_mutually_exclusive_group(required=False)
-group.add_argument('-j', dest='json', default=False, action='store_true',
-		   help='Dump JSON from go list instead of generating a Makefile')
-group.add_argument('-s', dest='std', default=False, action='store_true',
-		   help='Dump dependencies on standard packages instead of generating a Makefile')
-group.add_argument('-c', dest='config', default=False, action='store_true',
-		   help='Generate config entries for dependencies on standard packages instead of generating a Makefile')
-group.add_argument('-r', dest='override', default=False, action='store_true',
-		   help='Dump all dependencies that specify source files for standard packages')
+parser.add_argument('-b', dest='prefer_builtin', default=None, action='store_true',
+		    help='Prefer builtin standard packages over external versions')
+egroup = parser.add_mutually_exclusive_group(required=False)
+egroup.add_argument('-j', dest='json', default=False, action='store_true',
+		    help='Dump JSON from go list instead of generating a Makefile')
+egroup.add_argument('-s', dest='std', default=False, action='store_true',
+		    help='Dump dependencies on standard packages instead of generating a Makefile')
 parser.add_argument('lib_name',
 		    help='Name of the library')
 parser.add_argument('lib_dir',
@@ -85,17 +117,16 @@ if not os.path.exists(lib_dir):
 
 libprefix = vgolib(opt.lib_name)
 
-# Load std packages
-base_dir	= os.path.dirname(__file__) + '/..'
-libgo_dir	= base_dir + '/libgo'
-packages_idx	= libgo_dir + '/packages.idx'
-
+# Load index of std packages
 std_pkgs = {}
-with open(packages_idx, 'r') as f:
+with open(PACKAGES_IDX, 'r') as f:
 	lines = f.readlines()
 	for line in lines:
 		pkgs = line.rstrip().split(' ')
 		std_pkgs[pkgs[0]] = pkgs[1:] if len(pkgs) > 1 else []
+
+std_pkgs['unsafe'] = []
+ignore_pkgs = ['unsafe']
 
 # We start with the entrance file(s) and request information on all
 # dependencies for these files using `go list`. This will implicitly download
@@ -107,37 +138,41 @@ try:
 	build_info = go_list(opt.lib_dir, opt.files)
 	if opt.json:
 		out = build_info
-	elif opt.override:
-		build_info = json.loads(build_info)
-		for pkg in build_info['packages']:
-			if 'GoFiles' in pkg or 'CFiles' in pkg:
-				if pkg['ImportPath'] in std_pkgs:
-					out += pkg['ImportPath'] + '\n'
 	else:
 		build_info = json.loads(build_info)
-		std_deps = []
+
+		std_deps = {}
 		for pkg in build_info['packages']:
 			if pkg['ImportPath'] in std_pkgs:
-				std_deps.append(pkg['ImportPath'])
-				continue
+				if not ('GoFiles' in pkg or 'CFiles' in pkg):
+					std_deps[pkg['ImportPath']] = SPR_DEF
+					continue
 
-			if 'Standard' in pkg:
-				continue
+				# This is package path of a standard library
+				# but we have source files specified for this.
+				# So this overrides the standard package.
+				if opt.prefer_builtin:
+					std_deps[pkg['ImportPath']] = SPR_FORCE
+					continue
 
-			if opt.std or opt.config:
+				std_deps[pkg['ImportPath']] = SPR_OVERRIDE
+
+			if opt.std:
 				continue
 
 			# Check if this is the package that was specified with
 			# the entrance files. In that case, add all dependencies
-			if ('Target' in pkg or (('ImportPath' in pkg and
-			(pkg['ImportPath'] == opt.lib_name or
-			pkg['ImportPath'] == 'command-line-arguments')))):
-				if 'Deps' in pkg:
-					for dep in pkg['Deps']:
-						if dep in std_pkgs:
-							continue
+			if ('Target' in pkg or
+			   (pkg['ImportPath'] == opt.lib_name or
+			    pkg['ImportPath'] == 'command-line-arguments')):
+				if not 'Deps' in pkg:
+					continue
 
-						out += MK_DEPS.format(libprefix, dep)
+				for dep in pkg['Deps']:
+					if dep in ignore_pkgs:
+						continue
+
+					out += MK_DEPS.format(libprefix, dep)
 
 				continue
 
@@ -161,21 +196,58 @@ try:
 			# Add the package's dependencies
 			if 'Deps' in pkg:
 				for dep in pkg['Deps']:
-					if dep in std_pkgs:
+					if dep in ignore_pkgs:
 						continue
 
 					out += MK_DEPS.format(pkglibprefix, dep)
 
-		if opt.std:
-			for pkg in std_deps:
-				out += pkg + '\n'
-		elif opt.config:
-			for pkg in std_deps:
-				out += '\tselect LIBGO_PKG_{}\n'.format(vgolib(pkg))
+		# Resolve dependencies on standard packages
+		while True:
+			l = len(std_deps.items())
+
+			# Iterate over dependencies and add indirect
+			# dependencies
+			for (pkg, flag) in std_deps.copy().items():
+				if flag == SPR_OVERRIDE:
+					continue
+
+				for dep in std_pkgs[pkg]:
+					if dep in std_deps:
+						continue
+
+					std_deps[dep] = SPR_INDIRECT
+
+			# If we did not add anything during this round
+			# we have fully resolved dependencies
+			if l == len(std_deps.items()):
+				break
+
+		# Add standard package dependencies to link
+		for (pkg, flag) in std_deps.items():
+			if opt.std:
+				ext = ''
+
+				if flag == SPR_FORCE:
+					ext = ' [FORCE]'
+				elif flag == SPR_OVERRIDE:
+					ext = ' [OVERRIDE]'
+				elif flag == SPR_INDIRECT:
+					ext = ' [INDIRECT]'
+
+				out += pkg + ext + '\n'
+				continue
+
+			if flag == SPR_OVERRIDE:
+				continue
+
+			if pkg in ignore_pkgs:
+				continue
+
+			out += MK_LINKGOLIB.format(pkg)
 
 except Exception as e:
 	logging.fatal(e.args[0])
-	sys.exit(-1)
+	sys.exit()
 
 # Write the output either to stdout or the specified output file
 if opt.out == None:

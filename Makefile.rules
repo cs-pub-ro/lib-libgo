@@ -39,8 +39,8 @@ GO_PY3 := python3
 
 # To avoid name clashes with regular Unikraft libraries we build all the go
 # packages in the go subfolder of the build directory
-GO_DIR       = /go
-GO_BUILD_DIR = $(BUILD_DIR)$(GO_DIR)
+GO_PREFIX    = go
+GO_BUILD_DIR = $(BUILD_DIR)/$(GO_PREFIX)
 
 ################################################################################
 # Paths and Filenames
@@ -95,29 +95,39 @@ $(subst -ffreestanding,, \
 $(subst -fhosted,,$(1)))
 endef
 
+# _linkgolib $libname
+define _linkgolib =
+UK_OLIBS-y += $(call golibnametoolib,$(1))
+endef
+
 # Register a GO library to the build system. This might be GO main
 # or a different GO package (in which case we have the addtional
 # -fgo-pkgpath flag)
-# __addgolib $libname,$extraflags
+#
+# TODO: We do not handle the case where dependencies are includes
+#       multiple times
+#
+# __addgolib $libname,$extraflags,$linkit
 define __addgolib =
-$(call mk_sub_build_dir,$(GO_DIR)/$(1))
-UK_GOLIBS += $(1)
+$(call mk_sub_build_dir,$(GO_PREFIX)/$(1))
+UK_GOLIBS-y   += $(1)
+UK_OLIBS-$(3) += $(call golibnametoolib,$(1))
 $(eval $(call vgolib,$(1))_BASE  := $(_IMPORT_BASE))
 $(eval $(call vgolib,$(1))_BUILD := $(GO_BUILD_DIR)/$(1))
 $(eval $(call vgolib,$(1))_FLAGS += $(2))
 endef
 
-# _addgolib $libname,$extraflags
-_addgolib = $(call __addgolib,$(1),-fgo-pkgpath=$(1) $(2))
+# _addgolib $libname,$extraflags,$linkit
+_addgolib = $(call __addgolib,$(1),-fgo-pkgpath=$(1) $(2),$(3))
 
 # _addgolib $libname,$extraflags
-_addgoapp = $(call __addgolib,$(1),$(2))
+_addgoapp = $(call __addgolib,$(1),$(2),y)
 
 # Register a GO library and append it to the list of libraries that need to
 # be processed for dependency resolution before starting the actual build
 # addgolib $libname
 define addgolib
-$(call _addgolib,$(1),)
+$(call _addgolib,$(1),,y)
 UK_GOLIBS_R += $(1)
 endef
 
@@ -128,8 +138,7 @@ $(call addgolib,$(1))
 endif
 endef
 
-# Same as addgolib but for an GO application library supplying the main
-# package
+# Same as addgolib but for an GO application library supplying the main pkg
 # addgoapp $libname
 define addgoapp =
 $(call _addgoapp,$(1),)
@@ -163,6 +172,11 @@ $(3): $(2) $(4)
 UK_SRCS-y += $(2)
 UK_OBJS-y += $(3)
 $(eval $(call vprefix_golib,$(1),OBJS-y) += $(3))
+
 $(eval $(call vprefix_golib,$(1),CLEAN-y) += $(call build_clean,$(3)))
 $(eval $(call vprefix_golib,$(1),CLEAN-y) += $(call golibnametoalib,$(1)))
+
+$(GO_PREFIX)/$(1): $(3)
+
+.PHONY: $(GO_PREFIX)/$(1)
 endef

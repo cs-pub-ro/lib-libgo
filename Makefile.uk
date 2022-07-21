@@ -132,23 +132,10 @@ LIBGO_CFLAGS-y += -D__x86_64__
 LIBGO_ASFLAGS-y += -D__linux__
 LIBGO_ASFLAGS-y += -D__x86_64__
 
-LIBGO_GOFLAGS-y += -minline-all-stringops
-LIBGO_GOFLAGS-y += -fno-split-stack
-LIBGO_GOFLAGS-y += -fno-checking
-LIBGO_GOFLAGS-y += -Wno-return-local-addr
-LIBGO_GOFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0) += -g0
-LIBGO_GOFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1) += -g1
-LIBGO_GOFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL2) += -g2
-LIBGO_GOFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL3) += -g3
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_NONE) += -O0
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_NONE) += -fno-optimize-sibling-calls
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_NONE) += -fno-tree-vectorize
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_SIZE) += -Os
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_PERF) += -O2
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_DEADELIM) += -fdata-sections
-LIBGO_GOFLAGS-$(CONFIG_OPTIMIZE_DEADELIM) += -ffunction-sections
-LIBGO_GOFLAGS-y += -I$(LIBGO_BUILD)
-LIBGO_GOFLAGS = $(LIBGO_GOFLAGS-y)
+GOFLAGS-y += -minline-all-stringops
+GOFLAGS-y += -Wno-return-local-addr
+GOFLAGS-y += -Wno-maybe-uninitialized
+GOFLAGS-y += -Wno-uninitialized
 
 # libffi
 LIBGOFFI_CFLAGS-y += -DHAVE_CONFIG_H

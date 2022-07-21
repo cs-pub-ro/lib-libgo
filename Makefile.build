@@ -1,7 +1,7 @@
 # TODO: Can we create build rules for the Makefiles instead?
 ifneq ($(call qstrip,$(UK_GOLIBS_R) $(UK_GOLIBS_R-y)),)
 $(foreach L,$(UK_GOLIBS_R) $(UK_GOLIBS_R-y), \
-	$(shell $(GO_PY3) $(GO_BM) $(L) \
+	$(shell $(GO_PY3) $(GO_BM) -b $(L) \
 		$($(call vgolib,$(L))_BASE) \
 		-o $(call golibnametomk,$(L)) \
 		$($(call vprefix_golib,$(L),SRCS)) \
@@ -23,7 +23,6 @@ $(foreach L,$(UK_GOLIBS) $(UK_GOLIBS-y), \
 					$($(call vgolib,$(L))_DEPS-y)), \
 				$($(call vprefix_golib,$(L),FLAGS)) \
 				$($(call vprefix_golib,$(L),FLAGS-y)))); \
-		$(eval UK_OLIBS-y += $(call golibnametoolib,$(L))); \
 	, \
 		$(call verbose_info,Warning: $(L) has no sources$(comma) ignoring...) \
 	); \
