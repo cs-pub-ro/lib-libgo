@@ -132,10 +132,10 @@ LIBGO_CFLAGS-y += -D__x86_64__
 LIBGO_ASFLAGS-y += -D__linux__
 LIBGO_ASFLAGS-y += -D__x86_64__
 
-GOFLAGS-y += -minline-all-stringops
-GOFLAGS-y += -Wno-return-local-addr
-GOFLAGS-y += -Wno-maybe-uninitialized
-GOFLAGS-y += -Wno-uninitialized
+GOFLAGS-$(CONFIG_LIBGO) += -minline-all-stringops
+GOFLAGS-$(CONFIG_LIBGO) += -Wno-return-local-addr
+GOFLAGS-$(CONFIG_LIBGO) += -Wno-maybe-uninitialized
+GOFLAGS-$(CONFIG_LIBGO) += -Wno-uninitialized
 
 # libffi
 LIBGOFFI_CFLAGS-y += -DHAVE_CONFIG_H
