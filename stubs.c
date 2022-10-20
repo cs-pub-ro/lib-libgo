@@ -95,10 +95,10 @@ int munlockall(void)
 	return 0;
 }
 
-int msync(void *addr __unused, size_t length __unused, int flags __unused)
+/*int msync(void *addr __unused, size_t length __unused, int flags __unused)
 {
 	return 0;
-}
+}*/
 
 long ptrace(int request __unused, pid_t pid __unused, void *addr __unused,
 	    void *data __unused)
